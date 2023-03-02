@@ -161,6 +161,7 @@ const struct virtio_dispatch virtio_mmio_dispatch = {
 	.set_status = virtio_mmio_set_status,
 	.get_features = virtio_mmio_get_features,
 	.set_features = virtio_mmio_set_features,
+	.setup_vq = virtio_mmio_setup_virtqueue,
 	.read_config = virtio_mmio_read_config,
 	.write_config = virtio_mmio_write_config,
 	.reset_device = virtio_mmio_reset_device,
@@ -312,6 +313,7 @@ int virtio_mmio_device_init(struct virtio_mmio_device *vmdev, uintptr_t virt_mem
 	devid = virtio_mmio_read32(vdev, VIRTIO_MMIO_DEVICE_ID);
 	if (devid == 0) {
 		/* Placeholder */
+		metal_log(METAL_LOG_ERROR, "Device Id 0\n");
 		return -1;
 	}
 
@@ -320,10 +322,10 @@ int virtio_mmio_device_init(struct virtio_mmio_device *vmdev, uintptr_t virt_mem
 			  vdev->id.version);
 		return -1;
 	}
-	if (version != 1) {
-		metal_log(METAL_LOG_ERROR, "Bad version %08x\n", version);
-		return -1;
-	}
+	// if (version != 1) {
+	// 	metal_log(METAL_LOG_ERROR, "Bad version %08x\n", version);
+	// 	return -1;
+	// }
 
 	vendor = virtio_mmio_read32(vdev, VIRTIO_MMIO_VENDOR_ID);
 	metal_log(METAL_LOG_DEBUG, "VIRTIO %08x:%08x\n", vendor, devid);
@@ -352,9 +354,16 @@ int virtio_mmio_device_init(struct virtio_mmio_device *vmdev, uintptr_t virt_mem
 	/* Initialize bounce buffer list for hypervisorless virtio */
 	metal_list_init(&vmdev->bounce_buf_list);
 #endif
-	virtio_mmio_set_status(vdev, VIRTIO_CONFIG_STATUS_ACK);
-	virtio_mmio_write32(vdev, VIRTIO_MMIO_GUEST_PAGE_SIZE, 4096);
-
+	uint8_t status;
+	/* Reset the device */
+	virtio_mmio_set_status(vdev, VIRTIO_CONFIG_STATUS_RESET);
+	/* Set ack */
+	status = virtio_mmio_get_status(vdev);
+	virtio_mmio_set_status(vdev, status | VIRTIO_CONFIG_STATUS_ACK);
+#ifdef VIRTIO_MMIO_NO_LEGACY
+	status = virtio_mmio_get_status(vdev);
+	virtio_mmio_write32(vdev, status | VIRTIO_MMIO_GUEST_PAGE_SIZE, 4096);
+#endif
 	return 0;
 }
 

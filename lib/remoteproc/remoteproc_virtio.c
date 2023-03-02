@@ -172,6 +172,53 @@ static void rproc_virtio_reset_device(struct virtio_device *vdev)
 		rproc_virtio_set_status(vdev,
 					VIRTIO_CONFIG_STATUS_NEEDS_RESET);
 }
+/*
+ * Setup the virtqueue, note tha the virtqueue has been allocated in
+ * rproc_virtio_create_vdev(), so only need to initailize the virtqueue
+ * by virtqueue_create().
+ */
+struct virtqueue *rproc_virtio_setup_virtqueue(struct virtio_device *vdev,
+					       unsigned int idx,
+					       struct virtqueue *vq,
+					       void (*cb)(void *),
+					       void *cb_arg,
+					       const char *vq_name)
+{
+	struct remoteproc_virtio *rpvdev;
+	struct vring_alloc_info *vring_alloc_info;
+
+	rpvdev = metal_container_of(vdev, struct remoteproc_virtio, vdev);
+
+	if (vq != NULL) {
+		/*
+		 * virtioqueue has been allocated in rproc_virtio_create_vdev()
+		 * do not need pass virtioqueue to this function.
+		 */
+		metal_log(METAL_LOG_ERROR, "virtioqueue should be NULL\n");
+		return NULL;
+	}
+
+	if (idx > vdev->vrings_num) {
+		metal_log(METAL_LOG_ERROR, "idx too large\n");
+		return NULL;
+	}
+
+	vring_alloc_info = &vdev->vrings_info[idx].info;
+	vq = vdev->vrings_info[idx].vq;
+	if (virtqueue_create(vdev, idx, vq_name, vring_alloc_info,
+			     (void (*)(struct virtqueue *))cb,
+			     vdev->func->notify, vq)) {
+		metal_log(METAL_LOG_ERROR, "virtqueue_create failed\n");
+		return NULL;
+	}
+
+	vq->vq_dev = vdev;
+	vq->cb_arg = cb_arg;
+	virtqueue_set_shmem_io(vq, rpvdev->vdev_rsc_io);
+	virtqueue_enable_cb(vq);
+
+	return vq;
+}
 #endif
 
 static const struct virtio_dispatch remoteproc_virtio_dispatch_funcs = {
@@ -185,6 +232,7 @@ static const struct virtio_dispatch remoteproc_virtio_dispatch_funcs = {
 	 * be access only by one core: the master. In this case salve core has
 	 * only read access right.
 	 */
+	.setup_vq = rproc_virtio_setup_virtqueue,
 	.set_status = rproc_virtio_set_status,
 	.set_features = rproc_virtio_set_features,
 	.negotiate_features = rproc_virtio_negotiate_features,

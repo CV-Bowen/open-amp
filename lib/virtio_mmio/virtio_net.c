@@ -14,10 +14,6 @@
 #include <metal/device.h>
 #include <metal/irq.h>
 
-#if !defined(WITH_VIRTIO_MMIO)
-#error Only VIRTIO-MMIO transport layer supported
-#endif
-
 #define LOG_MODULE_NAME "virtio_net"
 
 static int virtio_net_rx_refill(struct virtio_net_data *pdata)
@@ -86,10 +82,7 @@ int virtio_net_init(struct virtio_device *vdev, struct virtqueue **vqs, char **v
 	metal_log(METAL_LOG_DEBUG, "features: %08x\n", features);
 
 	for (i = 0; i < vq_count; i++) {
-		/* TODO: update API for compatibility with other transports like
-		 * remoteproc virtio
-		 */
-		vq = virtio_mmio_setup_virtqueue(
+		vq = virtio_device_setup_virtqueue(
 				vdev,
 				i,
 				vqs[i],

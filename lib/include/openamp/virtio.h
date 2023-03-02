@@ -28,6 +28,7 @@ extern "C" {
 #define VIRTIO_DEV_ANY_ID    (-1)UL
 
 /* Status byte for guest to report progress. */
+#define VIRTIO_CONFIG_STATUS_RESET     0x00
 #define VIRTIO_CONFIG_STATUS_ACK       0x01
 #define VIRTIO_CONFIG_STATUS_DRIVER    0x02
 #define VIRTIO_CONFIG_STATUS_DRIVER_OK 0x04
@@ -183,7 +184,10 @@ struct virtio_dispatch {
 	void (*set_features)(struct virtio_device *dev, uint32_t feature);
 	uint32_t (*negotiate_features)(struct virtio_device *dev,
 				       uint32_t features);
-
+	struct virtqueue *(*setup_vq)(struct virtio_device *vdev,
+				      unsigned int idx, struct virtqueue *vq,
+				      void (*cb)(void *), void *cb_arg,
+				      const char *vq_name);
 	/*
 	 * Read/write a variable amount from the device specific (ie, network)
 	 * configuration region. This region is encoded in the same endian as
@@ -200,6 +204,11 @@ struct virtio_dispatch {
 int virtio_create_virtqueues(struct virtio_device *vdev, unsigned int flags,
 			     unsigned int nvqs, const char *names[],
 			     vq_callback callbacks[]);
+
+struct virtqueue *virtio_device_setup_virtqueue(struct virtio_device *vdev,
+						unsigned int idx, struct virtqueue *vq,
+						void (*cb)(void *), void *cb_arg,
+						const char *vq_name);
 
 /**
  * @brief Retrieve device status.

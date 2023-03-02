@@ -13,10 +13,6 @@
 #include <metal/device.h>
 #include <openamp/virtio_serial.h>
 
-#if !defined(WITH_VIRTIO_MMIO)
-#error Only VIRTIO-MMIO transport layer supported
-#endif
-
 int virtio_serial_init(struct virtio_device *vdev, struct virtqueue **vqs, char **vq_names,
 			    void (**cbs)(void *), void **cb_args, int vq_count)
 {
@@ -41,24 +37,24 @@ int virtio_serial_init(struct virtio_device *vdev, struct virtqueue **vqs, char 
 		return -ENODEV;
 	}
 	virtio_device_set_status(vdev, VIRTIO_CONFIG_STATUS_DRIVER);
-	virtio_device_set_features(vdev, 0/*VIRTIO_F_NOTIFY_ON_EMPTY*/);
+	virtio_device_set_features(vdev, 0);
 	features = virtio_device_get_features(vdev);
 	metal_log(METAL_LOG_DEBUG, "features: %08x\n", features);
+	virtio_device_set_status(vdev, virtio_device_get_status(vdev) |
+	                               VIRTIO_CONFIG_FEATURES_OK);
 
 	for (i = 0; i < vq_count; i++) {
-		/* TODO: update API for compatibility with other transports like
-		 * remoteproc virtio
-		 */
-		vq = virtio_mmio_setup_virtqueue(
-				vdev,
-				i,
-				vqs[i],
-				cbs[i],
-				cb_args[i],
-				vq_names[i]
-				);
+		vq = virtio_device_setup_virtqueue(
+			vdev,
+			i,
+			vqs[i],
+			cbs[i],
+			cb_args[i],
+			vq_names[i]
+			);
 
 		if (!vq) {
+			metal_log(METAL_LOG_ERROR, "Setup virtqueue failed\n");
 			return -1;
 		}
 	}

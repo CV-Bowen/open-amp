@@ -73,6 +73,14 @@ static const char *virtio_feature_name(unsigned long val,
 	return NULL;
 }
 
+struct virtqueue *virtio_device_setup_virtqueue(struct virtio_device *vdev,
+						unsigned int idx, struct virtqueue *vq,
+						void (*cb)(void *), void *cb_arg,
+						const char *vq_name)
+{
+	return vdev->func->setup_vq(vdev, idx, vq, cb, cb_arg, vq_name);
+}
+
 void virtio_describe(struct virtio_device *dev, const char *msg,
 		     uint32_t features, struct virtio_feature_desc *desc)
 {
