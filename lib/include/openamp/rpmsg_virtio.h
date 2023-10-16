@@ -165,6 +165,12 @@ rpmsg_virtio_create_virtqueues(struct rpmsg_virtio_device *rvdev,
 					callbacks, NULL);
 }
 
+static inline void
+rpmsg_virtio_delete_virtqueues(struct rpmsg_virtio_device *rvdev)
+{
+	virtio_delete_virtqueues(rvdev->vdev);
+}
+
 /**
  * @brief Get rpmsg virtio buffer size
  *

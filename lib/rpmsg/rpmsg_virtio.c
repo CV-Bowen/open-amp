@@ -757,8 +757,6 @@ int rpmsg_init_vdev_with_config(struct rpmsg_virtio_device *rvdev,
 		vq_names[1] = "tx_vq";
 		callback[0] = rpmsg_virtio_rx_callback;
 		callback[1] = rpmsg_virtio_tx_callback;
-		rvdev->rvq  = vdev->vrings_info[0].vq;
-		rvdev->svq  = vdev->vrings_info[1].vq;
 	}
 #endif /*!VIRTIO_DEVICE_ONLY*/
 
@@ -769,8 +767,6 @@ int rpmsg_init_vdev_with_config(struct rpmsg_virtio_device *rvdev,
 		vq_names[1] = "rx_vq";
 		callback[0] = rpmsg_virtio_tx_callback;
 		callback[1] = rpmsg_virtio_rx_callback;
-		rvdev->rvq  = vdev->vrings_info[1].vq;
-		rvdev->svq  = vdev->vrings_info[0].vq;
 	}
 #endif /*!VIRTIO_DRIVER_ONLY*/
 	rvdev->shbuf_io = shm_io;
@@ -781,6 +777,21 @@ int rpmsg_init_vdev_with_config(struct rpmsg_virtio_device *rvdev,
 						vq_names, callback);
 	if (status != RPMSG_SUCCESS)
 		return status;
+
+	/* Create virtqueue success, assign back the virtqueue */
+#ifndef VIRTIO_DEVICE_ONLY
+	if (role == RPMSG_HOST) {
+		rvdev->rvq  = vdev->vrings_info[0].vq;
+		rvdev->svq  = vdev->vrings_info[1].vq;
+	}
+#endif /*!VIRTIO_DEVICE_ONLY*/
+
+#ifndef VIRTIO_DRIVER_ONLY
+	if (role == RPMSG_REMOTE) {
+		rvdev->rvq  = vdev->vrings_info[1].vq;
+		rvdev->svq  = vdev->vrings_info[0].vq;
+	}
+#endif /*!VIRTIO_DRIVER_ONLY*/
 
 	/*
 	 * Suppress "tx-complete" interrupts
@@ -809,7 +820,8 @@ int rpmsg_init_vdev_with_config(struct rpmsg_virtio_device *rvdev,
 					rvdev->config.r2h_buf_size);
 
 			if (!buffer) {
-				return RPMSG_ERR_NO_BUFF;
+				status = RPMSG_ERR_NO_BUFF;
+				goto err;
 			}
 
 			vqbuf.buf = buffer;
@@ -823,7 +835,7 @@ int rpmsg_init_vdev_with_config(struct rpmsg_virtio_device *rvdev,
 						     buffer);
 
 			if (status != RPMSG_SUCCESS) {
-				return status;
+				goto err;
 			}
 		}
 	}
@@ -848,6 +860,10 @@ int rpmsg_init_vdev_with_config(struct rpmsg_virtio_device *rvdev,
 #endif /*!VIRTIO_DEVICE_ONLY*/
 
 	return status;
+
+err:
+	rpmsg_virtio_delete_virtqueues(rvdev);
+	return status;
 }
 
 void rpmsg_deinit_vdev(struct rpmsg_virtio_device *rvdev)
@@ -867,6 +883,7 @@ void rpmsg_deinit_vdev(struct rpmsg_virtio_device *rvdev)
 		rvdev->rvq = 0;
 		rvdev->svq = 0;
 
+		rpmsg_virtio_delete_virtqueues(rvdev);
 		metal_mutex_deinit(&rdev->lock);
 	}
 }
